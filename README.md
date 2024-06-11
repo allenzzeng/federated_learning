@@ -27,7 +27,7 @@ This code specifically focuses on applying federated learning to custom networks
 
 
 # federated_learning
-联邦迁移学习代码，可以自定义backbone  
+联邦学习、迁移学习代码，可以自定义backbone  
 本项目代码参考   
 https://github.com/WZMIAOMIAO/deep-learning-for-image-processing/tree/master https://github.com/DingXiaoH/RepVGG  
 和 https://github.com/FederatedAI/Practicing-Federated-Learning/tree/main/chapter03_Python_image_classification  
