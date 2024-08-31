@@ -1,3 +1,4 @@
+[中文](readme_zh.md)
 # Federated Learning
 
 This project implements federated transfer learning with the ability to customize the backbone network.
