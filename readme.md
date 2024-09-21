@@ -26,3 +26,4 @@ This code specifically focuses on applying federated learning to custom networks
 
 5. For transfer learning, import previously trained weights from `weight/tmp.pt`.
 
+MultiModal Learning Input in Branch 'MML'
