@@ -20,6 +20,8 @@ import os
 from sklearn import manifold
 import itertools
 from sklearn.metrics import confusion_matrix 
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
 
 # import torchvision
 # import torchvision.transforms as transforms
@@ -54,23 +56,51 @@ for epochs,step_size,gamma,weight_decay,p,lr,batch_size in product(*param_values
     # device = torch.device("cpu")
     print("using {} device.".format(device))
 
+
+
+    class ExtendedImageDataset(datasets.ImageFolder):
+        def __init__(self, root_dir, transform=None):
+            super(ExtendedImageDataset, self).__init__(root_dir, transform=transform)
+            
+        def __getitem__(self, index):
+            path, target = self.samples[index]
+            image = self.loader(path)
+            if self.transform is not None:
+                image = self.transform(image)
+            
+            # Assuming filename format 'img-label-param1-param2-param3-param4.jpg'
+            filename = os.path.splitext(os.path.basename(path))[0]
+            params = filename.split('-')[2:6]
+            params = torch.tensor([float(param) for param in params], dtype=torch.float32)
+            
+            return image, params, target
+
+    # Data transformations
     data_transform = {
         "train": transforms.Compose([
-                                    # transforms.RandomResizedCrop(224),
-                                     transforms.RandomHorizontalFlip(),#翻转之后对网络来说是全新的训练样例，一张图反过来放看他能不能认出来
-                                        transforms.Resize((224, 224)),
-                                        transforms.ToTensor(),
-                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-        "val": transforms.Compose([transforms.Resize((224, 224)),  # cannot 224, must (224, 224)
-                                    transforms.ToTensor(),
-                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])}
+            transforms.RandomHorizontalFlip(),
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ]),
+        "val": transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+    }
 
-    data_root = os.path.abspath(os.path.join(os.getcwd()))  # get data root path   os.getcwd()获取当前目录
+    # Paths
+    data_root = os.path.abspath(os.path.join(os.getcwd(), "data/own_val"))
+    train_path = os.path.join(data_root, "train")
+    val_path = os.path.join(data_root, "val")
 
-    image_path = os.path.join(data_root,"data/own_val") 
-    assert os.path.exists(image_path), "{} path does not exist.".format(image_path)
-    train_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
-                                            transform=data_transform["train"])
+    # Datasets
+    train_dataset = ExtendedImageDataset(root_dir=train_path, transform=data_transform["train"])
+    validate_dataset = ExtendedImageDataset(root_dir=val_path, transform=data_transform["val"])
+    
+
+
     train_num = len(train_dataset)
 
     # {'daisy':0, 'dandelion':1, 'roses':2, 'sunflower':3, 'tulips':4}
@@ -86,8 +116,6 @@ for epochs,step_size,gamma,weight_decay,p,lr,batch_size in product(*param_values
                                                 batch_size=batch_size, shuffle=True,
                                                 num_workers=nw)   #window为0，linux非0?>
 
-    validate_dataset = datasets.ImageFolder(root=os.path.join(image_path, "val"),
-                                            transform=data_transform["val"])
     val_num = len(validate_dataset)
     validate_loader = torch.utils.data.DataLoader(validate_dataset,
                                                     batch_size=batch_size, shuffle=False,
@@ -168,24 +196,30 @@ for epochs,step_size,gamma,weight_decay,p,lr,batch_size in product(*param_values
         XX_list = [] #含XX YY都是下载去获得tsne
         YY_list = []
         t1=time.perf_counter()
+
         for step, data in enumerate(train_bar):
-            images, labels = data
+            images, params, labels = data  # Unpack images, parameters, and labels from the data
+            if torch.cuda.is_available():
+                images = images.cuda()
+                params = params.cuda()  # Move parameters to GPU if available
+                labels = labels.cuda()
+            
             optimizer.zero_grad()
-            outputs = net(images.to(device))
-            loss = loss_function(outputs, labels.to(device))
-            running_correct += outputs.argmax(dim=1).eq(labels.to(device)).sum().item()
+            outputs = net(images, params)  # Pass both images and parameters to the model
+            loss = loss_function(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            # print statistics
+            # Calculate accuracy
+            running_correct += outputs.argmax(dim=1).eq(labels).sum().item()
             running_loss += loss.item()
-            #打印训练进度25分讲到
-            train_bar.desc = "train epoch[{}/{}] loss:{:.3f}".format(epoch + 1,   #没讲到，应该与训练进度的柱状图有关
-                                                                        epochs,                #{:.3f} python利用format方法保留三位小数的详细内容 https://www.php.cn/python-tutorials-448883.html
-                                                                        loss)        # desc（‘str‘）: 传入进度条的前缀
+
+            # Update training progress description
+            train_bar.desc = f"train epoch[{epoch + 1}/{epochs}] loss:{loss:.3f}"
+
         traintime=time.perf_counter()-t1
         print(f"traintime={traintime}")
-        traintimelist.append(traintime)
+        traintimelist.append(traintime)           
         Train_correct = running_correct / train_num
         Train_Accuracy_list.append(Train_correct)
         Train_loss = running_loss /step
@@ -201,27 +235,35 @@ for epochs,step_size,gamma,weight_decay,p,lr,batch_size in product(*param_values
         count=0
         val_loss = 0.0
         t2=time.perf_counter()
+
         with torch.no_grad():
             val_bar = tqdm(validate_loader, file=sys.stdout)
             for stp, val_data in enumerate(val_bar):
-                # for val_data in val_bar:
-                val_images, val_labels = val_data
-                outputs = net(val_images.to(device))
+                val_images, val_params, val_labels = val_data  # Unpack images, parameters, and labels
+                if torch.cuda.is_available():
+                    val_images = val_images.cuda()
+                    val_params = val_params.cuda()  # Move parameters to GPU if available
+                    val_labels = val_labels.cuda()
+
+                outputs = net(val_images, val_params)  # Pass both images and parameters to the model
                 predict_y = torch.max(outputs, dim=1)[1]
-                acc += torch.eq(predict_y, val_labels.to(device)).sum().item()
-                loss = loss_function(outputs, val_labels.to(device))
+                acc += torch.eq(predict_y, val_labels).sum().item()
+                loss = loss_function(outputs, val_labels)
                 val_loss += loss.item()
-                #t-sne
-                count = count+1
+
+                # t-sne data collection
+                count += 1
                 if count == 1:
-                    X = outputs
-                    Y = val_labels
-                elif count >= 2:
+                    X = outputs  # Initialize X for the first batch
+                    Y = val_labels  # Initialize Y for the first batch
+                else:
                     X = torch.cat((X, outputs), dim=0)
                     Y = torch.cat((Y, val_labels), dim=0)
-                    
-                    XX_list.append(outputs.cpu().detach().numpy())  # Convert X and Y to numpy arrays
-                    YY_list.append(val_labels.cpu().numpy())
+
+                XX_list.append(outputs.cpu().detach().numpy())  # Collect data for t-SNE
+                YY_list.append(val_labels.cpu().numpy())
+
+
             valtime=time.perf_counter()-t2
 
             if epoch==(epochs-1):
@@ -267,14 +309,14 @@ for epochs,step_size,gamma,weight_decay,p,lr,batch_size in product(*param_values
 
             # tb.add_scalar('val_accurate',val_accurate,epoch+1)
 
-            # if epoch+1>=910:
-            #     torch.save(net.state_dict(), 'temp.pth')
-            #     print(f"epoch={epoch}")
-            #     print(val_num)
-            #     print(val_num-acc)
-            #     #成员变量alist在上面
-            #     alist=falsePredict(alist)
-            #     # print(alist)
+            if epoch+1>=1:
+                torch.save(net.state_dict(), 'temp.pth')
+                print(f"epoch={epoch}")
+                print(f"val_num={val_num}")
+                print(f"val_num-acc={val_num-acc}")
+                #成员变量alist在上面
+                alist=falsePredict(alist)
+                # print(alist)
 
             if val_accurate > best_acc:
                 best_acc = val_accurate
@@ -394,15 +436,19 @@ for epochs,step_size,gamma,weight_decay,p,lr,batch_size in product(*param_values
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
 
-    def get_all_preds(model,loader):
-        all_preds=torch.tensor([])#空的新pytorch张量
-        with torch.no_grad(): 
+    def get_all_preds(model, loader):
+        all_preds = torch.tensor([])  # Empty tensor to accumulate predictions
+        with torch.no_grad():  # No gradient needed for inference mode
             for batch in loader:
-                images,labels=batch
-                preds=model(images.to(device)).cpu() #TypeError: can‘t convert CUDA tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory fi
-                all_preds=torch.cat(
-                (all_preds,preds)
-                ,dim=0)
+                images, params, labels = batch  # Ensure loader provides images, params, and labels
+                if torch.cuda.is_available():
+                    images = images.cuda()
+                    params = params.cuda()  # Move parameters to GPU if available
+                    labels = labels.cuda()
+                
+                preds = model(images, params).cpu()  # Make predictions using both images and params
+                all_preds = torch.cat((all_preds, preds), dim=0)  # Concatenate the predictions
+                
         return all_preds
 
     # #验证标签和验证预测的图------------------------------------------------------------------------------

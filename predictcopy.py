@@ -9,13 +9,10 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from collections import Counter
 
-def falsePredict(alist,e):
+def falsePredict(alist):
     alist=alist
     # 读取文件夹的路径
-    folder_path = "./data/own_val/photo"
-    folder_path1 = "./data/own_val/photo/1"
-    folder_path2 = "./data/own_val/photo/2"
-    folder_path0 = "./data/own_val/photo/0"
+    folder_path = "./data/own_val/val"
     tmp_model().cuda() if torch.cuda.is_available() else tmp_model()
     model = tmp_model()
     # in_channel = model.fc.in_features
@@ -55,10 +52,19 @@ def falsePredict(alist,e):
                     img = data_transform(img)
                     img = torch.unsqueeze(img, dim=0)
                     img.cuda() if torch.cuda.is_available() else img
+
+                    file,_=os.path.splitext(f)
+                    parts = file.split('-')[2:6]  # 根据文件名结构调整
+                    params = torch.tensor([float(part) for part in parts], dtype=torch.float32)
+                    params = torch.unsqueeze(params, dim=0)
+                    params.cuda() if torch.cuda.is_available() else img
+                    
                     model.eval()
                     with torch.no_grad():
-                        # predict class        
-                        output = torch.squeeze(model(img)).cpu()
+                        # predict class     
+                        output = model(img, params)  
+                        output = torch.squeeze(output).cpu()
+                        
                         # test=output.device
                         # print(f"output.device={test}")
                         #如果想把CUDA tensor格式的数据改成numpy时，需要先将其转换成cpu float-tensor随后再转到numpy格式。
@@ -97,10 +103,18 @@ def falsePredict(alist,e):
                     img = torch.unsqueeze(img, dim=0)
                     img.cuda() if torch.cuda.is_available() else img
 
+                    file,_=os.path.splitext(f)
+                    parts = file.split('-')[2:6]  # 根据文件名结构调整
+                    params = torch.tensor([float(part) for part in parts], dtype=torch.float32)
+                    params = torch.unsqueeze(params, dim=0)
+                    params.cuda() if torch.cuda.is_available() else img
+                    
                     model.eval()
                     with torch.no_grad():
-                        # predict class        
-                        output = torch.squeeze(model(img)).cpu()
+                        # predict class     
+                        output = model(img, params)  
+                        output = torch.squeeze(output).cpu()
+
                         # test=output.device
                         # print(f"output.device={test}")
                         #如果想把CUDA tensor格式的数据改成numpy时，需要先将其转换成cpu float-tensor随后再转到numpy格式。
@@ -135,10 +149,18 @@ def falsePredict(alist,e):
                     img = torch.unsqueeze(img, dim=0)
                     img.cuda() if torch.cuda.is_available() else img
 
+                    file,_=os.path.splitext(f)
+                    parts = file.split('-')[2:6]  # 根据文件名结构调整
+                    params = torch.tensor([float(part) for part in parts], dtype=torch.float32)
+                    params = torch.unsqueeze(params, dim=0)
+                    params.cuda() if torch.cuda.is_available() else img
+                    
                     model.eval()
                     with torch.no_grad():
-                        # predict class        
-                        output = torch.squeeze(model(img)).cpu()
+                        # predict class     
+                        output = model(img, params)  
+                        output = torch.squeeze(output).cpu()
+
                         # test=output.device
                         # print(f"output.device={test}")
                         #如果想把CUDA tensor格式的数据改成numpy时，需要先将其转换成cpu float-tensor随后再转到numpy格式。
@@ -171,24 +193,24 @@ def falsePredict(alist,e):
     print(f"count={count}")
     print('len(res):',len(res))
 
-    # 在len和自己设置取最小删除
-    if not os.path.exists('./result_files/removedelete.txt'):
-        open('./result_files/removedelete.txt', 'w').close()
-    else:
-        open('./result_files/removedelete.txt', 'w').close()
-    if len(res)>0:
-        with open('./result_files/removedelete.txt','a') as f:
-            f.write("  30..  ")
-            f.write(f'{len(res)}\n')
-        for i in range(min(len(res),1)):
-            if '0+' in res[i][0]:
-                temppath = os.path.join(folder_path0, res[i][0])
-            if '1+' in res[i][0]:
-                temppath = os.path.join(folder_path1, res[i][0])
-            if '2+' in res[i][0]:
-                temppath = os.path.join(folder_path2, res[i][0])
-            with open('./result_files/removedelete.txt','a') as f:
-                f.write(f'{res[i][0]}\n')
-            os.remove(temppath)
+    # # 在len和自己设置取最小删除
+    # if not os.path.exists('./result_files/removedelete.txt'):
+    #     open('./result_files/removedelete.txt', 'w').close()
+    # else:
+    #     open('./result_files/removedelete.txt', 'w').close()
+    # if len(res)>0:
+    #     with open('./result_files/removedelete.txt','a') as f:
+    #         f.write("  30..  ")
+    #         f.write(f'{len(res)}\n')
+    #     for i in range(min(len(res),1)):
+    #         if '0+' in res[i][0]:
+    #             temppath = os.path.join(folder_path0, res[i][0])
+    #         if '1+' in res[i][0]:
+    #             temppath = os.path.join(folder_path1, res[i][0])
+    #         if '2+' in res[i][0]:
+    #             temppath = os.path.join(folder_path2, res[i][0])
+    #         with open('./result_files/removedelete.txt','a') as f:
+    #             f.write(f'{res[i][0]}\n')
+    #         os.remove(temppath)
 
     return(alist)

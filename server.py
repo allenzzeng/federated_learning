@@ -36,34 +36,6 @@ class Server(object):
 			else:
 				data.add_(update_per_layer)
 				
-	# def model_eval(self):
-	# 	self.global_model.eval()
-		
-	# 	total_loss = 0.0
-	# 	correct = 0
-	# 	dataset_size = 0
-	# 	for batch_id, batch in enumerate(self.eval_loader):
-	# 		data, target = batch 
-	# 		dataset_size += data.size()[0]
-			
-	# 		if torch.cuda.is_available():
-	# 			data = data.cuda()
-	# 			target = target.cuda()
-				
-			
-	# 		output = self.global_model(data)
-			
-	# 		total_loss += torch.nn.functional.cross_entropy(output, target,
-	# 										  reduction='sum').item() # sum up batch loss
-	# 		pred = output.data.max(1)[1]  # get the index of the max log-probability
-	# 		correct += pred.eq(target.data.view_as(pred)).cpu().sum().item()
-
-	# 	acc = 100.0 * (float(correct) / float(dataset_size))
-	# 	total_l = total_loss / dataset_size
-
-	# 	return acc, total_l
-     
-
 
 	def model_eval(self,epoch,best_acc,valtimelist,Valid_Accuracy_list):
 
@@ -74,28 +46,27 @@ class Server(object):
 			XX_list = [] #含XX YY都是下载去获得tsne
 			YY_list = []
 			acc,val_loss,count=0,0,0
-			for stp, val_data in enumerate(val_bar):
-				# for val_data in val_bar:
-				val_images, val_labels = val_data
+			for stp, (val_images, val_params, val_labels) in enumerate(val_bar):
 				if torch.cuda.is_available():
-					val_images = val_images.cuda()
+					al_images = val_images.cuda()
+					val_params = val_params.cuda()
 					val_labels = val_labels.cuda()
-				outputs = self.global_model(val_images)
+                
+				outputs = self.global_model(val_images, val_params)
 				predict_y = torch.max(outputs, dim=1)[1]
 				acc += torch.eq(predict_y, val_labels).sum().item()
 				loss_function = nn.CrossEntropyLoss()
 				loss = loss_function(outputs, val_labels)
 				val_loss += loss.item()
-				#t-sne
-				count = count+1
+				count += 1
 				if count == 1:
 					X = outputs
 					Y = val_labels
-				elif count >= 2:
+				else:
 					X = torch.cat((X, outputs), dim=0)
 					Y = torch.cat((Y, val_labels), dim=0)
-	
-				XX_list.append(outputs.cpu().detach().numpy())  # Convert X and Y to numpy arrays
+                
+				XX_list.append(outputs.cpu().detach().numpy())
 				YY_list.append(val_labels.cpu().numpy())
 			valtime=time.perf_counter()-t2
 			XX = np.concatenate(XX_list, axis=0)  # Concatenate the X arrays along the rows
@@ -202,21 +173,22 @@ class Server(object):
 				plt.tight_layout()
 				plt.ylabel('True label')
 				plt.xlabel('Predicted label')
-	
-			def get_all_preds(model,loader):
-				all_preds=torch.tensor([])#空的新pytorch张量
-				with torch.no_grad(): 
+
+			def get_all_preds(model, loader):
+				all_preds = torch.tensor([])  # Empty tensor to accumulate predictions
+				with torch.no_grad():  # No gradient needed for inference mode
 					for batch in loader:
-						images,labels=batch
+						images, params, labels = batch  # Unpack the batch; ensure loader provides images, params, and labels
 						if torch.cuda.is_available():
 							images = images.cuda()
+							params = params.cuda()  # Move parameters to GPU if available
 							labels = labels.cuda()
-						preds=model(images).cpu() #TypeError: can‘t convert CUDA tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory fi
-						all_preds=torch.cat(
-						(all_preds,preds)
-						,dim=0)
+						
+						preds = model(images, params).cpu()  # Make predictions using both images and params
+						all_preds = torch.cat((all_preds, preds), dim=0)  # Concatenate the predictions
+						
 				return all_preds
-	
+			
 			# #验证标签和验证预测的图------------------------------------------------------------------------------
 			self.global_model.load_state_dict(torch.load('./weight/tmp.pt'))   #默认应该本次训练的net
 			val_preds=get_all_preds(self.global_model,self.eval_loader)

@@ -152,6 +152,7 @@ class MobileNetV3(nn.Module):
                  inverted_residual_setting: List[InvertedResidualConfig],
                  last_channel: int,
                  num_classes: int = 1000,
+                 num_additional_features:int=4,
                  block: Optional[Callable[..., nn.Module]] = None,
                  norm_layer: Optional[Callable[..., nn.Module]] = None):
         super(MobileNetV3, self).__init__()
@@ -192,10 +193,15 @@ class MobileNetV3(nn.Module):
                                        activation_layer=nn.Hardswish))
         self.features = nn.Sequential(*layers)
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.classifier = nn.Sequential(nn.Linear(lastconv_output_c, last_channel),
+
+        self.fc1 = nn.Linear(lastconv_output_c, last_channel)       #
+        self.fc2 = nn.Linear(num_additional_features, last_channel)      #
+
+        self.classifier = nn.Sequential(nn.Linear(last_channel*2, last_channel),    #
                                         nn.Hardswish(inplace=True),
                                         nn.Dropout(p=0.2, inplace=True),
                                         nn.Linear(last_channel, num_classes))
+        
 
         # initial weights
         for m in self.modules():
@@ -210,66 +216,26 @@ class MobileNetV3(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.zeros_(m.bias)
 
-    def _forward_impl(self, x: Tensor) -> Tensor:
+    def _forward_impl(self, x: Tensor,additional_params) -> Tensor:    #
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
+
+        x=self.fc1(x)    #
+        p=self.fc2(additional_params)    #
+        x=torch.cat((x,p),dim=1)    #
+
         x = self.classifier(x)
 
         return x
 
-    def forward(self, x: Tensor) -> Tensor:
-        return self._forward_impl(x)
-
-
-def mobilenet_v3_large(num_classes: int = 1000,
-                       reduced_tail: bool = False) -> MobileNetV3:
-    """
-    Constructs a large MobileNetV3 architecture from
-    "Searching for MobileNetV3" <https://arxiv.org/abs/1905.02244>.
-
-    weights_link:
-    https://download.pytorch.org/models/mobilenet_v3_large-8738ca79.pth
-
-    Args:
-        num_classes (int): number of classes
-        reduced_tail (bool): If True, reduces the channel counts of all feature layers
-            between C4 and C5 by 2. It is used to reduce the channel redundancy in the
-            backbone for Detection and Segmentation.
-    """
-    width_multi = 1.0
-    bneck_conf = partial(InvertedResidualConfig, width_multi=width_multi)
-    adjust_channels = partial(InvertedResidualConfig.adjust_channels, width_multi=width_multi)
-
-    reduce_divider = 2 if reduced_tail else 1
-
-    inverted_residual_setting = [
-        # input_c, kernel, expanded_c, out_c, use_se, activation, stride
-        bneck_conf(16, 3, 16, 16, False, "RE", 1),
-        bneck_conf(16, 3, 64, 24, False, "RE", 2),  # C1
-        bneck_conf(24, 3, 72, 24, False, "RE", 1),
-        bneck_conf(24, 5, 72, 40, True, "RE", 2),  # C2
-        bneck_conf(40, 5, 120, 40, True, "RE", 1),
-        bneck_conf(40, 5, 120, 40, True, "RE", 1),
-        bneck_conf(40, 3, 240, 80, False, "HS", 2),  # C3
-        bneck_conf(80, 3, 200, 80, False, "HS", 1),
-        bneck_conf(80, 3, 184, 80, False, "HS", 1),
-        bneck_conf(80, 3, 184, 80, False, "HS", 1),
-        bneck_conf(80, 3, 480, 112, True, "HS", 1),
-        bneck_conf(112, 3, 672, 112, True, "HS", 1),
-        bneck_conf(112, 5, 672, 160 // reduce_divider, True, "HS", 2),  # C4
-        bneck_conf(160 // reduce_divider, 5, 960 // reduce_divider, 160 // reduce_divider, True, "HS", 1),
-        bneck_conf(160 // reduce_divider, 5, 960 // reduce_divider, 160 // reduce_divider, True, "HS", 1),
-    ]
-    last_channel = adjust_channels(1280 // reduce_divider)  # C5
-
-    return MobileNetV3(inverted_residual_setting=inverted_residual_setting,
-                       last_channel=last_channel,
-                       num_classes=num_classes)
+    def forward(self, x: Tensor,additional_params) -> Tensor:    #
+        return self._forward_impl(x,additional_params)    #
 
 
 def model_changed_name(num_classes: int = 3,
-                       reduced_tail: bool = False) -> MobileNetV3:
+                       reduced_tail: bool = False,
+                       num_additional_features:int=4) -> MobileNetV3:    #
     """
     Constructs a large MobileNetV3 architecture from
     "Searching for MobileNetV3" <https://arxiv.org/abs/1905.02244>.
@@ -307,4 +273,5 @@ def model_changed_name(num_classes: int = 3,
 
     return MobileNetV3(inverted_residual_setting=inverted_residual_setting,
                        last_channel=last_channel,
-                       num_classes=num_classes)
+                       num_classes=num_classes,
+                       num_additional_features=num_additional_features)    #

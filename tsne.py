@@ -5,6 +5,7 @@ def plot_t_sne(preds_result, labels):
     tsne = manifold.TSNE(n_components=2, init="pca")  # random_state=501
     #   TSNE是一种降维算法，用于将高维数据映射到低维空间。本例中，n_components表示将高维数据降维到二维，init="pca"表示使用PCA作为初始化方法。
     best_preds = preds_result
+    tsne = manifold.TSNE(perplexity=1)
     X_tsne = tsne.fit_transform(best_preds)
     x_min, x_max = np.min(X_tsne, axis=0), np.max(X_tsne, axis=0)
     encoder_result1 = ((X_tsne - x_min) / (x_max - x_min))
