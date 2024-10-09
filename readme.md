@@ -12,7 +12,7 @@ This code specifically focuses on applying federated learning to custom networks
 
 1. The folders under `./data/own_train/` contain all client datasets. `data/own_val/photo` is the validation dataset, `data/own_val/train` is the transfer learning training set, and `data/own_val/val` is the transfer learning validation set.
 
-2. In the `weights` folder, parameters include:
+2. In the `utils` folder, parameters include:
    - `batch_size`: Batch size
    - `local_epochs`: Number of training epochs per client
    - `global_epochs`: Number of global training epochs
