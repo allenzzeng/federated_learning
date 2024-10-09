@@ -16,7 +16,7 @@
 - **迁移学习验证集**：位于 `data/own_val/val`。
 
 ## 配置参数
-存储于 `weights` 文件夹中：
+存储于 `utils` 文件夹中：
 - `batch_size`：批次大小。
 - `local_epochs`：每个客户端进行的训练次数。
 - `global_epochs`：全局训练次数。
