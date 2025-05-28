@@ -5,6 +5,7 @@ This project implements federated transfer learning with the ability to customiz
 
 The code is inspired by:
 - [WZMIAOMIAO's deep-learning-for-image-processing repository](https://github.com/WZMIAOMIAO/deep-learning-for-image-processing/tree/master)
+- [mobilenetv4](https://github.com/jaiwei98/MobileNetV4-pytorch/blob/main/mobilenet/mobilenetv4.py)
 - [DingXiaoH's RepVGG repository](https://github.com/DingXiaoH/RepVGG)
 - [FederatedAI's Practicing-Federated-Learning repository](https://github.com/FederatedAI/Practicing-Federated-Learning/tree/main/chapter03_Python_image_classification)
 
