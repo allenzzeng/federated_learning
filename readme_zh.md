@@ -6,6 +6,7 @@
 ## 代码参考
 本项目的代码灵感来源于以下资源：
 - [WZMIAOMIAO的图像处理深度学习仓库](https://github.com/WZMIAOMIAO/deep-learning-for-image-processing/tree/master)
+- [mobilenetv4](https://github.com/jaiwei98/MobileNetV4-pytorch/blob/main/mobilenet/mobilenetv4.py)
 - [DingXiaoH的RepVGG仓库](https://github.com/DingXiaoH/RepVGG)
 - [FederatedAI的联邦学习实践仓库](https://github.com/FederatedAI/Practicing-Federated-Learning/tree/main/chapter03_Python_image_classification)
 
